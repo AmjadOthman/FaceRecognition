@@ -1,0 +1,17 @@
+[Unit]
+Description = Run facial recognition software
+
+[Service]
+Type = simple
+
+WorkingDirectory = ${HOME}/facial-recognition/
+Environment = "PYTHONPATH=$PYTHONPATH:${HOME}/facial-recognition/.venv/lib/python3.8/site-packages/"
+
+ExecStartPre= /bin/bash -c 'systemctl restart nvargus-daemon && sleep 15'
+ExecStart = /bin/bash -c 'cd ${HOME}/facial-recognition/ && source .venv/bin/activate && LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1 python3 FacialRecognition-IMX219.py'
+
+Restart = on-failure
+RestartSec = 60s
+
+[Install]
+WantedBy = multi-user.target

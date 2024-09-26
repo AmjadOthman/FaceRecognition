@@ -1,0 +1,10 @@
+[Unit]
+Description = Removes CSV files from ${HOME}/facial-recognition/ directory.
+Wants = CSVFileRemover.timer
+
+[Service]
+Type = oneshot
+ExecStart = /bin/bash -c 'cd ${HOME}/facial-recognition/ && rm attendance_*.csv || echo NO_CSVs_FOUND'
+
+[Install]
+WantedBy = multi-user.target

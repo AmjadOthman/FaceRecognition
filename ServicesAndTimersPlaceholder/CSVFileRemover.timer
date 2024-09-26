@@ -1,0 +1,11 @@
+[Unit]
+Description = Run the CSVFileRemover service every day at midnight.
+Requires = CSVFileRemover.service
+
+[Timer]
+Unit = CSVFileRemover.service
+OnCalendar = *-*-* 00:00:00
+AccuracySec= 5s
+
+[Install]
+WantedBy = timers.target

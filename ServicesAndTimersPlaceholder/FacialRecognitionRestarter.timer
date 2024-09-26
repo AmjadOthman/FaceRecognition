@@ -1,0 +1,11 @@
+[Unit]
+Description = Restart the FacialRecognition service every day of the week just after midnight.
+Requires = FacialRecognitionRestarter.service
+
+[Timer]
+Unit = FacialRecognitionRestarter.service
+OnCalendar = *-*-* 00:01:00
+AccuracySec= 10s
+
+[Install]
+WantedBy = timers.target

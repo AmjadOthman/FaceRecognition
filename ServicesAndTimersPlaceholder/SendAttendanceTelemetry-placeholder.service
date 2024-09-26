@@ -1,0 +1,15 @@
+[Unit]
+Description = Send attendance records received from the monitored CSV file as telemetries to IoT Central.
+
+[Service]
+Type = simple
+
+WorkingDirectory = ${HOME}/facial-recognition/
+Environment = "PYTHONPATH=$PYTHONPATH:${HOME}/facial-recognition/.venv/lib/python3.8/site-packages/"
+ExecStart = /bin/bash -c 'cd ${HOME}/facial-recognition/ && source .venv/bin/activate && python3 SendAttendanceTelemetry.py'
+
+Restart = on-failure
+RestartSec = 30s
+
+[Install]
+WantedBy = multi-user.target

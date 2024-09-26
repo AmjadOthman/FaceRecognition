@@ -1,0 +1,11 @@
+[Unit]
+Description = Restart the SendAttendanceTelemetry service every day of the week 30 seconds after midnight.
+Requires = SendAttendanceTelemetryRestarter.service
+
+[Timer]
+Unit = SendAttendanceTelemetryRestarter.service
+OnCalendar = *-*-* 00:00:30
+AccuracySec= 10s
+
+[Install]
+WantedBy = timers.target
