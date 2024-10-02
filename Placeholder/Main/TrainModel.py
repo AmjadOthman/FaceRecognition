@@ -4,6 +4,7 @@ import pickle
 import face_recognition
 import logging
 import dlib
+import numpy as np
 
 def getDets(image):
     """
@@ -20,7 +21,10 @@ def getDets(image):
     imgGRAY = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     detector = dlib.get_frontal_face_detector()
     dets = detector(imgGRAY,1)
-    return dets, imgGRAY
+    if len(dets) > 0:
+        return dets[0], imgGRAY
+    else:
+        return None, imgGRAY
 
 def processFace(face_aligned):
     """
@@ -40,7 +44,7 @@ def processFace(face_aligned):
 
     return face_normalized
 
-def saveDataSet(knownEncodings, knownNames, file_path ="employee.p" ):
+def saveDataSet(knownEncodings, knownNames, file_path = "employee.p" ):
     """
     Desc:
         Serialize the encodings with names in a pickle file.
@@ -56,71 +60,157 @@ def saveDataSet(knownEncodings, knownNames, file_path ="employee.p" ):
         pickle.dump(data, f)
     logging.info("serializing encodings completed")
 
-def main():
+def loadData(file_path = "employee.p" ):
+    """
+    Desc:
+        load the encodings with names in a pickle file.
+
+    Args:
+        file_path (str): Path to the pickle file (default: "employee.p")
+    Return:
+        the serialized encodings and names
+    """
+    with open(file_path, "rb") as f:
+        data =  pickle.load(f)
+        return data['encodings'], data['names']
+
+def recognitionByImages():
     #set up logging
     logging.basicConfig(level=logging.INFO)
 
     #importing images
     folderPath = "Images"
-    imagesPathList = os.listdir(folderPath)
+    employees = os.listdir(folderPath)
+    #print(imagesPathList)
 
     #initialize known encodings and names
     knownEncodings = []
     knownNames = []
 
     #split known images path to the id or name
-    for i, imagePath in enumerate(imagesPathList):
+    for i, employee in enumerate(employees):
+        knownNames.append(employee)
 
-        #get the name
-        logging.info(f'Image {i} Processing: {imagePath}')
-        name = os.path.splitext(imagePath)[0]
+        #get the directory list images
+        employeeFolderPath = os.path.join(folderPath, employee)
+        imagePathList = os.listdir(employeeFolderPath)
 
-        #read the image and convert to RGB
-        image = cv2.imread(os.path.join(folderPath, imagePath))
+        imageEncodingList = []
+        logging.info(f'{i+1}:{employee}: Images Processing and Encodings Started...')
 
-        if image is None:
-            logging.error(f"Error: Unable to read image file {imagePath}")
-            continue
+        for i, imagePath in enumerate(imagePathList):
+            imagePath = os.path.join(employeeFolderPath, imagePath)
 
-        #get face detections
-        dets, imgGRAY = getDets(image)
+            #read images
+            image = cv2.imread(imagePath)
 
-        print("dets", dets)
-        for k, d in enumerate(dets):
-            x, y, x2, y2 = d.left(), d.top(), d.right(), d.bottom()
+            if image is None:
+                logging.error(f"Error: Unable to read image file {imagePath}")
+                continue
+
+            #get the detections of the face
+            det, imgGRAY = getDets(image)
+            x, y, x2, y2 = det.left(), det.top(), det.right(), det.bottom()
+
+            #crop the face in the image
             face_aligned = imgGRAY[y:y2, x:x2]
-
             face_normalized = processFace(face_aligned)
 
-        try:
-            #get image's encoding, get face coordinate
-            logging.info(f'Image {i} encoding started...')
-            faceLocation = face_recognition.face_locations(face_normalized, model="cnn", number_of_times_to_upsample=1)
-            imageEncoding = face_recognition.face_encodings(face_normalized, faceLocation, model="large", num_jitters=1)[0]
-            knownEncodings.append(imageEncoding)
-            knownNames.append(name)
-            print(f'name:{name}\nFace Location: {faceLocation}\n Encodings: {imageEncoding}')
-            #save encodings and names
+            try:
+                #get image's encoding, get face coordinate
+                faceLocation = face_recognition.face_locations(face_normalized, model="cnn", number_of_times_to_upsample=1)
+                imageEncoding = face_recognition.face_encodings(face_normalized, faceLocation, model="large", num_jitters=1)
+                for encoding in imageEncoding:
+                    imageEncodingList.append(encoding)
 
-            logging.info(f'Image {i} encoding completed\n\n')
-        except Exception as e:
-            logging.error(f"Error: Unable to encode image {imagePath}: {e}")
-            continue
-
+            except Exception as e:
+                logging.error(f"Error: Unable to encode image {imagePath}: {e}")
+                continue
+        averageEncoding = np.average(imageEncodingList, axis=0)
+        knownEncodings.append(averageEncoding)
+        logging.info(f'{i}:{employee}: Images Processing and Encodings End.')
 
     #save data set in the file
     saveDataSet(knownEncodings, knownNames)
 
-    #test the pickle file
-    #f=open("employee.p", "rb")
-    #data = pickle.load(f)
-    #print(data)
-    #f.close()
+def recognnitionByVideo():
+    cap = cv2.VideoCapture(0)
+    names, encodings = loadData()
+    encodingsList = []
 
+
+
+    employeeName = input("Enter the name of Employer:\n")
+    names.append(employeeName)
+
+
+    mainFolderPath = "Images"
+    employeeFolder = os.path.join(mainFolderPath, employeeName)
+
+    if not os.path.exists(mainFolderPath):
+        os.mkdir(employeeFolder)
+
+    if not os.path.exists(employeeFolder):
+        os.mkdir(employeeFolder)
+
+    # Get the number of images in the employee's folder
+    imagePathList = os.listdir(employeeFolder)
+    imagePathList = [imagePath for imagePath in imagePathList if imagePath.endswith('.jpg') or imagePath.endswith('.png')]
+    imageCounter = len(imagePathList)
+
+    while True:
+        success, frame = cap.read()
+
+        if not success:
+            logging.error("Unable to open camera")
+            break
+
+        print(f"Position the employee in direction {imageCounter} (e.g. front, left, right, etc.)")
+
+        key = cv2.waitKey(0)
+
+        if key == ord('c'):
+            cv2.imwrite(f'{os.path.join(employeeFolder, str(imageCounter+1))}.jpg', frame)
+            imageCounter+=1
+
+            det, imgGRAY = getDets(frame)
+            if det is not None:
+                #crop the face
+                x, y, x2, y2 = det.left(), det.top(), det.right(), det.bottom()
+                cv2.rectangle(frame, (x, y), (x2, y2), (0, 0, 255), 2)
+                #crop the face in the image
+                face_aligned = imgGRAY[y:y2, x:x2]
+                face_normalized = processFace(face_aligned)
+                try:
+                    #get image's encoding, get face coordinate
+                    faceLocation = face_recognition.face_locations(face_normalized, model="cnn", number_of_times_to_upsample=1)
+                    imageEncoding = face_recognition.face_encodings(face_normalized, faceLocation, model="large", num_jitters=1)[0]
+                    encodingsList.append(imageEncoding)
+                except Exception as e:
+                    logging.error(f"Error: Unable to encode image {imageCounter+1}.jpg: {e}")
+                    continue
+            else:
+                logging.error("Thee face is not detected!")
+        elif key == ord('q'):
+            break
+
+
+        cv2.imshow("Video", frame)
+
+    # Calculate the average encoding
+    if len(encodingsList) > 0:
+        averageEncoding = np.mean(encodingsList, axis=0)
+        #encodings.append(averageEncoding)
+        print("encodings",encodingsList)
+        print(averageEncoding)
+    else:
+        logging.error("No encodings found")
+
+    saveDataSet(encodings, names)
 
 
 
 if __name__=="__main__":
-    main()
+    recognnitionByVideo()
 
 
